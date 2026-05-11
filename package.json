@@ -1,16 +1,11 @@
 {
   "name": "aura-bot-whatsapp",
   "version": "1.0.0",
-  "description": "Microservicio de WhatsApp para Aura League Pro",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "postinstall": "npx puppeteer install"
+    "build": "./render-build.sh",
+    "start": "node index.js"
   },
-  "keywords": [],
-  "author": "Marco - MRCA Solutions",
-  "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.18.2",

@@ -7,85 +7,102 @@ const os = require('os');
 const path = require('path');
 
 // ==========================================
-// CONFIGURACIÓN DE RUTA TEMPORAL (SOLUCIÓN PLAN B)
+// CONFIGURACIÓN DE RUTA TEMPORAL (DINÁMICA)
 // ==========================================
-// Esto crea una carpeta fuera de OneDrive para que no haya errores de permisos
+// Esto asegura que funcione en Windows (local) y Linux (Render)
 const tempPath = path.join(os.tmpdir(), 'aura_league_session');
-console.log(`📂 Iniciando sesión en ruta local segura: ${tempPath}`);
+console.log(`📂 Sistema de archivos: Guardando sesión en ${tempPath}`);
 
-// 1. Inicializar Firebase Admin (Asegúrate que el archivo esté en la carpeta)
+// 1. Inicializar Firebase Admin
+// Recuerda que en Render este archivo debe estar cargado como "Secret File"
 const serviceAccount = require("./serviceAccount.json");
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
-});
+if (!admin.apps.length) {
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+    });
+}
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 2. Configuración Blindada del Cliente de WhatsApp
+// 2. Configuración Robusta del Cliente de WhatsApp
 const client = new Client({
-    // Forzamos a que guarde la sesión en la carpeta temporal de Windows
     authStrategy: new LocalAuth({ dataPath: tempPath }), 
     puppeteer: {
         headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+        // Al eliminar la ruta fija, permitimos que el Build Script encuentre Chrome solo
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--single-process', 
+            '--disable-gpu'
+        ]
     },
-    // Evita el error de "Execution context was destroyed" por actualizaciones de Meta
     webVersionCache: {
         type: 'remote',
         remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html'
     }
 });
 
-// Evento para mostrar el QR
+// Evento para el QR en consola
 client.on('qr', (qr) => {
-    console.log('📱 ESCANEA ESTE CÓDIGO QR PARA AURA LEAGUE PRO:');
+    console.log('📱 [AURA LEAGUE PRO] ESCANEA ESTE QR PARA ACTIVAR EL BOT:');
     qrcode.generate(qr, { small: true });
 });
 
-// Evento cuando el bot ya está listo
+// Confirmación de conexión
 client.on('ready', () => {
-    console.log('✅ BOT CONECTADO: Ahora puedes registrar capitanes en la plataforma.');
+    console.log('✅ ESTADO: BOT CONECTADO Y FUNCIONANDO EN LA NUBE');
 });
 
-client.initialize();
+client.initialize().catch(err => {
+    console.error("❌ Error al iniciar el cliente de WhatsApp:", err);
+});
 
 // ==========================================
-// RUTA 1: ENVIAR CÓDIGO DE VERIFICACIÓN
+// ENDPOINT 1: ENVÍO DE CÓDIGO (VERIFICACIÓN)
 // ==========================================
 app.post('/api/enviar-verificacion', async (req, res) => {
     const { numero, codigo } = req.body;
     try {
-        const numeroFinal = `521${numero}@c.us`; 
-        const mensaje = `[Aura League Pro] 🛡️\n\nTu código de verificación es: *${codigo}*\n\nNo compartas este código. Úsalo para validar tu número de celular.`;
+        const numeroLimpio = numero.toString().replace(/\D/g, '');
+        const numeroFinal = `521${numeroLimpio}@c.us`; 
+        const mensaje = `[Aura League Pro] 🛡️\n\nTu código de verificación es: *${codigo}*\n\nNo compartas este código con nadie.`;
         
         await client.sendMessage(numeroFinal, mensaje);
-        res.status(200).json({ exito: true, mensaje: 'WhatsApp enviado' });
+        res.status(200).json({ exito: true, mensaje: 'Código enviado por WhatsApp' });
     } catch (error) {
-        console.error('Error:', error);
+        console.error('Error en ruta verificacion:', error);
         res.status(500).json({ exito: false, error: error.message });
     }
 });
 
 // ==========================================
-// RUTA 2: ENVIAR TOKEN FINAL
+// ENDPOINT 2: ENVÍO DE TOKEN (REGISTRO FINAL)
 // ==========================================
 app.post('/api/enviar-token-final', async (req, res) => {
     const { numero, nombre, token } = req.body;
     try {
-        const numeroFinal = `521${numero}@c.us`;
-        const mensaje = `¡Bienvenido ${nombre}! 🏆\n\nTu registro en *Aura League Pro* ha sido exitoso.\n\nTu Token Maestro de Capitán es: *${token}*\n\nGuárdalo bien, lo ocuparás para entrar al panel.`;
+        const numeroLimpio = numero.toString().replace(/\D/g, '');
+        const numeroFinal = `521${numeroLimpio}@c.us`;
+        const mensaje = `¡Bienvenido ${nombre}! 🏆\n\nTu registro en *Aura League Pro* ha sido exitoso.\n\nTu Token Maestro es: *${token}*\n\nÚsalo para ingresar a la plataforma.`;
 
         await client.sendMessage(numeroFinal, mensaje);
-        res.status(200).json({ exito: true, mensaje: 'Token enviado' });
+        res.status(200).json({ exito: true, mensaje: 'Token enviado con éxito' });
     } catch (error) {
+        console.error('Error en ruta token:', error);
         res.status(500).json({ exito: false, error: error.message });
     }
 });
 
-const PORT = 3001;
-app.listen(PORT, () => {
-    console.log(`🚀 Microservicio corriendo en http://localhost:${PORT}`);
+// Puerto dinámico para Render
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Microservicio operativo en el puerto ${PORT}`);
 });
