@@ -45,7 +45,7 @@ const bot = new Client({
 // Mostrar el código QR
 bot.on('qr', (qr) => {
     console.log('📱 [AURA LEAGUE PRO] ESCANEA ESTE QR AHORA:');
-    qrcode.generate(qr, { small: true });
+    qrcode.generate(qr, { small: false });
 });
 
 // Confirmación de conexión
